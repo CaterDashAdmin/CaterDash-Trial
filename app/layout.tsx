@@ -17,7 +17,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      {/* Basic body, no specific layout classes like flex or padding */}
+      <head>
+        <link rel="preload" href="/label.png" as="image" />
+      </head>
       <body>{children}</body>
     </html>
   );

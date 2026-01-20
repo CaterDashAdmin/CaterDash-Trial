@@ -118,6 +118,8 @@ export default function LabelMaker() {
             <img
               src="/label.png"
               alt="CaterDash Logo"
+              loading="eager"
+              decoding="sync"
               className="h-20 w-auto object-contain ml-5 flex-shrink-0"
             />
 
