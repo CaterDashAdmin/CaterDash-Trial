@@ -169,7 +169,7 @@ export default function LabelMaker() {
               </label>
               <input
                 type="text"
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent transition-shadow"
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg text-sm transition-shadow"
                 placeholder="e.g., Monday Lunch - ABC Company"
                 value={pageTitle}
                 onChange={(e) => setPageTitle(e.target.value)}
@@ -202,7 +202,7 @@ export default function LabelMaker() {
                 </div>
               </div>
               <textarea
-                className="w-full h-64 px-4 py-3 border border-gray-200 rounded-lg font-mono text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent transition-shadow resize-none"
+                className="w-full h-64 px-4 py-3 border border-gray-200 rounded-lg font-mono text-sm transition-shadow resize-none"
                 value={inputText}
                 onChange={handleInputChange}
                 placeholder="Enter items, one per line&#10;&#10;Add dietary tags in parentheses:&#10;Veggie Wrap (Vegan)&#10;Caesar Salad (GF)"
@@ -249,38 +249,6 @@ export default function LabelMaker() {
                 <span className="text-gray-400 text-xs">5 labels per page</span>
               </div>
             </div>
-
-            {/* Tips Card */}
-            <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
-              <div className="flex gap-3">
-                <svg
-                  className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-                <div className="text-sm text-amber-800">
-                  <p className="font-medium mb-1">Quick Tips</p>
-                  <ul className="text-xs space-y-1 text-amber-700">
-                    <li>
-                      Add dietary info in parentheses:{" "}
-                      <code className="bg-amber-100 px-1 rounded">
-                        Salad (Vegan)
-                      </code>
-                    </li>
-                    <li>Long tags will automatically wrap to a new line</li>
-                    <li>Use landscape orientation when printing</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
           </div>
 
           {/* Right Panel - Preview */}
@@ -288,12 +256,14 @@ export default function LabelMaker() {
             {/* Preview Header */}
             <div className="px-5 py-3 border-b border-gray-200 bg-gray-50">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-gray-700">Preview</h2>
+                <h2 className="text-sm font-semibold text-gray-700">
+                  On-screen preview (not to scale)
+                </h2>
               </div>
             </div>
 
             {/* Preview Content */}
-            <div className="p-4 bg-gray-200 max-h-[600px] overflow-y-auto">
+            <div className="p-4 bg-gray-200 h-[479px] overflow-y-auto">
               {computedLabels.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                   <svg
@@ -319,40 +289,41 @@ export default function LabelMaker() {
                   {pages.filter(Boolean).map((pageLabels, pageIndex) => (
                     <div
                       key={pageIndex}
-                      className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 relative"
+                      className="bg-white rounded shadow-md overflow-hidden border border-gray-300 relative"
+                      style={{ aspectRatio: "11 / 8.5" }}
                     >
-                      {/* Labels - styled like print output */}
-                      <div className="divide-y divide-gray-200">
+                      {/* Labels - matches print layout */}
+                      <div className="flex flex-col h-full">
                         {pageLabels.map((item, index) => (
                           <div
                             key={index}
-                            className="bg-white flex items-center px-4 py-3 gap-4"
+                            className="flex py-4 mr-10 border-b border-r border-gray-300 bg-white flex items-center px-3 gap-3 overflow-hidden"
                           >
-                            {/* Logo */}
+                            {/* Logo - proportional to print */}
                             <img
                               src="/label.png"
                               alt="CaterDash Logo"
-                              className="h-10 w-auto object-contain flex-shrink-0"
+                              className="h-8 w-auto object-contain ml-2 flex-shrink-0"
                             />
 
                             {/* Label Text - matches print styling */}
-                            <div className="flex-grow min-w-0">
+                            <div className="flex-grow min-w-0 flex flex-col justify-center">
                               {item.inline ? (
-                                <p className="text-lg font-bold text-gray-900 truncate">
+                                <p className="text-sm font-bold text-gray-900 truncate">
                                   {item.name}{" "}
                                   {item.tag && (
-                                    <span className="text-gray-700">
+                                    <span className="text-gray-800">
                                       ({item.tag})
                                     </span>
                                   )}
                                 </p>
                               ) : (
                                 <>
-                                  <p className="text-lg font-bold text-gray-900 truncate">
+                                  <p className="text-sm font-bold text-gray-900 truncate">
                                     {item.name}
                                   </p>
                                   {item.tag && (
-                                    <p className="text-sm italic text-gray-500 truncate">
+                                    <p className="text-xs italic text-gray-600 truncate">
                                       ({item.tag})
                                     </p>
                                   )}
@@ -361,17 +332,26 @@ export default function LabelMaker() {
                             </div>
                           </div>
                         ))}
+                        {/* Empty space for remaining labels if less than 5 */}
+                        {Array.from({
+                          length: LABELS_PER_PAGE - pageLabels.length,
+                        }).map((_, i) => (
+                          <div
+                            key={`empty-${i}`}
+                            className="flex-1 border-b border-r border-gray-300 bg-white"
+                          />
+                        ))}
                       </div>
 
                       {/* Bottom right: title and page number */}
                       {(pageTitle || pages.length > 1) && (
-                        <div className="absolute bottom-2 right-3 text-right">
+                        <div className="absolute bottom-1 right-2 text-right">
                           {pageTitle && (
-                            <p className="text-xs font-medium text-gray-500 truncate max-w-32">
+                            <p className="text-[10px] font-medium text-gray-500 truncate max-w-28">
                               {pageTitle}
                             </p>
                           )}
-                          <p className="text-[10px] text-gray-400">
+                          <p className="text-[9px] text-gray-400">
                             Page {pageIndex + 1} of {pages.length}
                           </p>
                         </div>
