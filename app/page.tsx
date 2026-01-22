@@ -44,7 +44,6 @@ export default function LabelMaker() {
   const [labels, setLabels] = useState<LabelItem[]>([]);
   const [isMounted, setIsMounted] = useState(false);
   const [pageTitle, setPageTitle] = useState("");
-  const activeTab = "preview";
 
   useEffect(() => {
     setIsMounted(true);
@@ -94,7 +93,7 @@ export default function LabelMaker() {
   if (!isMounted) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 print:bg-white print:p-0">
+    <div className="min-h-screen print:bg-white print:p-0">
       <style>{`
         @media print {
           @page {
@@ -121,7 +120,7 @@ export default function LabelMaker() {
       `}</style>
 
       {/* Header */}
-      <header className="no-print bg-white border-b border-gray-200 sticky top-0 z-10">
+      <header className="no-print bg-white border-b border-gray-300 sticky top-0 z-10">
         <div className="max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -294,7 +293,7 @@ export default function LabelMaker() {
             </div>
 
             {/* Preview Content */}
-            <div className="p-5 bg-gray-100 max-h-[600px] overflow-y-auto">
+            <div className="p-4 bg-gray-200 max-h-[600px] overflow-y-auto">
               {computedLabels.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                   <svg
@@ -316,61 +315,74 @@ export default function LabelMaker() {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {pages.filter(Boolean).map((pageLabels, pageIndex) => (
                     <div
                       key={pageIndex}
-                      className="bg-white rounded-lg shadow-sm overflow-hidden"
+                      className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200"
                     >
-                      {/* Mini Page Title */}
+                      {/* Page Header - matches print */}
                       {pageTitle && (
-                        <div className="bg-gray-800 text-white px-3 py-2 flex items-center justify-between">
-                          <span className="text-xs font-medium truncate">
+                        <div className="px-4 py-2 flex items-center justify-between border-b border-gray-200">
+                          <span className="text-sm font-bold truncate">
                             {pageTitle}
                           </span>
-                          <span className="text-xs opacity-60">
-                            {activeTab === "preview"
-                              ? `Page ${pageIndex + 1}/${pages.length}`
-                              : `Page 1/${pages.length}`}
+                          <span className="text-xs opacity-75">
+                            Page {pageIndex + 1} of {pages.length}
                           </span>
                         </div>
                       )}
 
-                      {/* Mini Labels */}
-                      <div className="divide-y divide-gray-100">
+                      {/* Labels - styled like print output */}
+                      <div className="divide-y divide-gray-200">
                         {pageLabels.map((item, index) => (
                           <div
                             key={index}
-                            className="px-3 py-2.5 flex items-center gap-3"
+                            className="bg-white flex items-center px-4 py-3 gap-4"
                           >
-                            <div className="w-8 h-8 bg-red-50 rounded flex items-center justify-center flex-shrink-0">
-                              <svg
-                                className="w-4 h-4 text-red-600"
-                                fill="none"
-                                stroke="currentColor"
-                                viewBox="0 0 24 24"
-                              >
-                                <path
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  strokeWidth={2}
-                                  d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"
-                                />
-                              </svg>
-                            </div>
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm font-semibold text-gray-900 truncate">
-                                {item.name}
-                              </p>
-                              {item.tag && (
-                                <p className="text-xs text-gray-500">
-                                  ({item.tag})
+                            {/* Logo */}
+                            <img
+                              src="/label.png"
+                              alt="CaterDash Logo"
+                              className="h-10 w-auto object-contain flex-shrink-0"
+                            />
+
+                            {/* Label Text - matches print styling */}
+                            <div className="flex-grow min-w-0">
+                              {item.inline ? (
+                                <p className="text-lg font-bold text-gray-900 truncate">
+                                  {item.name}{" "}
+                                  {item.tag && (
+                                    <span className="text-gray-700">
+                                      ({item.tag})
+                                    </span>
+                                  )}
                                 </p>
+                              ) : (
+                                <>
+                                  <p className="text-lg font-bold text-gray-900 truncate">
+                                    {item.name}
+                                  </p>
+                                  {item.tag && (
+                                    <p className="text-sm italic text-gray-500 truncate">
+                                      ({item.tag})
+                                    </p>
+                                  )}
+                                </>
                               )}
                             </div>
                           </div>
                         ))}
                       </div>
+
+                      {/* Page footer indicator */}
+                      {!pageTitle && pages.length > 1 && (
+                        <div className="bg-gray-50 px-4 py-1.5 text-center">
+                          <span className="text-xs text-gray-400">
+                            Page {pageIndex + 1} of {pages.length}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -386,7 +398,7 @@ export default function LabelMaker() {
           <div key={pageIndex} className="print-page flex flex-col w-full">
             {/* Page Title */}
             {pageTitle && (
-              <div className="w-full bg-gray-800 text-white py-3 px-6">
+              <div className="w-full py-3 px-6 border-b border-gray-300">
                 <div className="flex items-center justify-between">
                   <h2 className="text-xl font-bold">{pageTitle}</h2>
                   <span className="text-sm opacity-75">
@@ -401,7 +413,7 @@ export default function LabelMaker() {
               <div
                 key={index}
                 style={{ width: "9.83in", height: "1.374in" }}
-                className="border-b border-r bg-white flex items-center justify-between px-6 gap-6 overflow-hidden"
+                className="border-b border-r border-gray-300 bg-white flex items-center justify-between px-6 gap-6 overflow-hidden"
               >
                 <img
                   src="/label.png"
