@@ -175,7 +175,7 @@ export default function LabelMaker() {
                 onChange={(e) => setPageTitle(e.target.value)}
               />
               <p className="mt-2 text-xs text-gray-400">
-                Appears vertically on the right side of each page
+                Appears in the bottom right of each page
               </p>
             </div>
 
@@ -319,10 +319,10 @@ export default function LabelMaker() {
                   {pages.filter(Boolean).map((pageLabels, pageIndex) => (
                     <div
                       key={pageIndex}
-                      className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 flex"
+                      className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200 relative"
                     >
                       {/* Labels - styled like print output */}
-                      <div className="flex-grow divide-y divide-gray-200">
+                      <div className="divide-y divide-gray-200">
                         {pageLabels.map((item, index) => (
                           <div
                             key={index}
@@ -363,25 +363,17 @@ export default function LabelMaker() {
                         ))}
                       </div>
 
-                      {/* Vertical sidebar with title and page number */}
+                      {/* Bottom right: title and page number */}
                       {(pageTitle || pages.length > 1) && (
-                        <div className="w-8 bg-gray-100 border-l border-gray-200 flex flex-col items-center justify-between py-2 flex-shrink-0">
+                        <div className="absolute bottom-2 right-3 text-right">
                           {pageTitle && (
-                            <div
-                              className="flex-grow flex items-center justify-center"
-                              style={{ writingMode: "vertical-rl" }}
-                            >
-                              <span className="text-xs font-semibold text-gray-700 truncate max-h-48">
-                                {pageTitle}
-                              </span>
-                            </div>
+                            <p className="text-xs font-medium text-gray-500 truncate max-w-32">
+                              {pageTitle}
+                            </p>
                           )}
-                          <span
-                            className="text-[10px] text-gray-400 mt-2"
-                            style={{ writingMode: "vertical-rl" }}
-                          >
-                            {pageIndex + 1}/{pages.length}
-                          </span>
+                          <p className="text-[10px] text-gray-400">
+                            Page {pageIndex + 1} of {pages.length}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -396,67 +388,58 @@ export default function LabelMaker() {
       {/* Print Layout - Hidden on screen */}
       <div className="hidden print:block">
         {pages.map((pageLabels, pageIndex) => (
-          <div key={pageIndex} className="print-page flex flex-row w-full">
+          <div
+            key={pageIndex}
+            className="print-page flex flex-col w-full relative"
+          >
             {/* Labels on this page */}
-            <div className="flex-grow flex flex-col">
-              {pageLabels.map((item, index) => (
-                <div
-                  key={index}
-                  style={{ width: "9.83in", height: "1.374in" }}
-                  className="border-b border-r border-gray-300 bg-white flex items-center px-6 gap-6 overflow-hidden"
-                >
-                  <img
-                    src="/label.png"
-                    alt="CaterDash Logo"
-                    loading="eager"
-                    decoding="sync"
-                    className="h-20 w-auto object-contain ml-5 flex-shrink-0"
-                  />
+            {pageLabels.map((item, index) => (
+              <div
+                key={index}
+                style={{ width: "9.83in", height: "1.374in" }}
+                className="border-b border-r border-gray-300 bg-white flex items-center px-6 gap-6 overflow-hidden"
+              >
+                <img
+                  src="/label.png"
+                  alt="CaterDash Logo"
+                  loading="eager"
+                  decoding="sync"
+                  className="h-20 w-auto object-contain ml-5 flex-shrink-0"
+                />
 
-                  <div className="flex-grow min-w-0 flex flex-col justify-center mx-4">
-                    {item.inline ? (
-                      <h2 className="text-4xl font-bold">
-                        {item.name}{" "}
-                        {item.tag && (
-                          <span className="text-gray-800">({item.tag})</span>
-                        )}
-                      </h2>
-                    ) : (
-                      <>
-                        <h2 className="text-4xl font-bold">{item.name}</h2>
-                        {item.tag && (
-                          <p className="text-2xl italic text-gray-600 mt-1 truncate">
-                            ({item.tag})
-                          </p>
-                        )}
-                      </>
-                    )}
-                  </div>
+                <div className="flex-grow min-w-0 flex flex-col justify-center mx-4">
+                  {item.inline ? (
+                    <h2 className="text-4xl font-bold">
+                      {item.name}{" "}
+                      {item.tag && (
+                        <span className="text-gray-800">({item.tag})</span>
+                      )}
+                    </h2>
+                  ) : (
+                    <>
+                      <h2 className="text-4xl font-bold">{item.name}</h2>
+                      {item.tag && (
+                        <p className="text-2xl italic text-gray-600 mt-1 truncate">
+                          ({item.tag})
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
+
+            {/* Bottom right: title and page number */}
             {(pageTitle || pages.length > 1) && (
-              <div className="w-12 bg-gray-100 border-l border-gray-300 flex flex-col items-center justify-between py-4 flex-shrink-0">
+              <div className="absolute bottom-2 right-4 text-right text-gray-500">
                 {pageTitle && (
-                  <div
-                    className="flex-grow flex items-center justify-center"
-                    style={{ writingMode: "vertical-rl" }}
-                  >
-                    <span className="text-sm font-bold text-gray-700">
-                      {pageTitle}
-                    </span>
-                  </div>
+                  <p className="text-sm font-medium">{pageTitle}</p>
                 )}
-                <span
-                  className="text-xs text-gray-500 mt-2"
-                  style={{ writingMode: "vertical-rl" }}
-                >
+                <p className="text-xs">
                   Page {pageIndex + 1} of {pages.length}
-                </span>
+                </p>
               </div>
             )}
-
-            {/* Vertical sidebar with title and page number */}
           </div>
         ))}
       </div>
