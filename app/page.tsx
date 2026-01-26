@@ -399,7 +399,7 @@ export default function LabelMaker() {
                     <>
                       <h2 className="text-4xl font-bold">{item.name}</h2>
                       {item.tag && (
-                        <p className="text-2xl italic text-gray-600 mt-1 truncate">
+                        <p className="text-xl italic text-gray-600 mt-1">
                           ({item.tag})
                         </p>
                       )}
