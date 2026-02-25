@@ -6,6 +6,7 @@ interface LabelItem {
   name: string;
   tag?: string;
   inline?: boolean;
+  forceNewLine?: boolean;
 }
 
 const DEFAULT_MENU_ITEMS = `Chicken Sandwiches
@@ -52,10 +53,12 @@ export default function LabelMaker() {
   const generateLabels = (text: string) => {
     const lines = text.split("\n").filter(Boolean);
     const parsed = lines.map((line) => {
-      const tagMatch = line.match(/\(([^)]+)\)/);
-      const name = line.replace(/\([^)]+\)/, "").trim();
+      const forceNewLine = line.includes("\\n");
+      const cleanedLine = line.replace("\\n", " ").trim();
+      const tagMatch = cleanedLine.match(/\(([^)]+)\)/);
+      const name = cleanedLine.replace(/\([^)]+\)/, "").trim();
       const tag = tagMatch ? tagMatch[1] : undefined;
-      return { name, tag };
+      return { name, tag, forceNewLine };
     });
     setLabels(parsed);
   };
@@ -80,6 +83,7 @@ export default function LabelMaker() {
   const computedLabels = useMemo(() => {
     if (!isMounted) return labels;
     return labels.map((item) => {
+      if (item.forceNewLine) return { ...item, inline: false };
       if (!item.tag) return { ...item, inline: true };
       const width = measureTextWidth(`${item.name} (${item.tag})`);
       return { ...item, inline: width < MAX_TEXT_WIDTH };
@@ -205,7 +209,7 @@ export default function LabelMaker() {
                 className="w-full h-64 px-4 py-3 border border-gray-200 rounded-lg font-mono text-sm transition-shadow resize-none"
                 value={inputText}
                 onChange={handleInputChange}
-                placeholder="Enter items, one per line&#10;&#10;Add dietary tags in parentheses:&#10;Veggie Wrap (Vegan)&#10;Caesar Salad (GF)"
+                placeholder="Enter items, one per line&#10;&#10;Add dietary tags in parentheses:&#10;Veggie Wrap (Vegan)&#10;Caesar Salad (GF)&#10;&#10;Use \n to force the tag to a new line:&#10;Chicken Shawarma Rice Bowls \n(Halal)"
               />
 
               {/* Stats Bar */}
