@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 
 interface LabelItem {
   name: string;
@@ -13,11 +13,11 @@ const DEFAULT_MENU_ITEMS = `Chicken Sandwiches
 Roast Beef Sandwiches
 Salami & Swiss Sandwiches
 Prosciutto & Brie Sandwiches
-Veggie Sandwiches (Veg)
+Veggie Sandwiches \\tag{Veg}
 Fruit Cups
 Chicken Shawarma Rice Bowls
 Beef Shawarma Rice Bowls
-Falafel Rice Bowls (Vegan)`;
+Falafel Rice Bowls \\tag{Vegan}`;
 
 const MAX_TEXT_WIDTH = 680;
 const LABELS_PER_PAGE = 5;
@@ -54,10 +54,10 @@ export default function LabelMaker() {
     const lines = text.split("\n").filter(Boolean);
     const parsed = lines.map((line) => {
       const forceNewLine = line.includes("\\n");
-      const cleanedLine = line.replace("\\n", " ").trim();
-      const tagMatch = cleanedLine.match(/\(([^)]+)\)/);
-      const name = cleanedLine.replace(/\([^)]+\)/, "").trim();
-      const tag = tagMatch ? tagMatch[1] : undefined;
+      const cleanedLine = line.replace(/\\n/g, "\n").trim();
+      const tagMatches = [...cleanedLine.matchAll(/\\tag\{([^}]+)\}/g)];
+      const name = cleanedLine.replace(/\\tag\{[^}]+\}/g, "").trim();
+      const tag = tagMatches.length > 0 ? tagMatches.map((m) => m[1]).join(" · ") : undefined;
       return { name, tag, forceNewLine };
     });
     setLabels(parsed);
@@ -80,15 +80,23 @@ export default function LabelMaker() {
     setPageTitle("");
   };
 
+  const previewContainerRef = useRef<HTMLDivElement>(null);
+  const [previewScale, setPreviewScale] = useState(1);
+
+  useEffect(() => {
+    if (!isMounted) return;
+    const el = previewContainerRef.current;
+    if (!el) return;
+    const update = () => setPreviewScale((el.clientWidth - 32) / 1056);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isMounted]);
+
   const computedLabels = useMemo(() => {
-    if (!isMounted) return labels;
-    return labels.map((item) => {
-      if (item.forceNewLine) return { ...item, inline: false };
-      if (!item.tag) return { ...item, inline: true };
-      const width = measureTextWidth(`${item.name} (${item.tag})`);
-      return { ...item, inline: width < MAX_TEXT_WIDTH };
-    });
-  }, [labels, isMounted]);
+    return labels.map((item) => ({ ...item, inline: !item.forceNewLine }));
+  }, [labels]);
 
   const pages = useMemo(() => {
     return chunkArray(computedLabels, LABELS_PER_PAGE);
@@ -209,8 +217,29 @@ export default function LabelMaker() {
                 className="w-full h-64 px-4 py-3 border border-gray-200 rounded-lg font-mono text-sm transition-shadow resize-none"
                 value={inputText}
                 onChange={handleInputChange}
-                placeholder="Enter items, one per line&#10;&#10;Add dietary tags in parentheses:&#10;Veggie Wrap (Vegan)&#10;Caesar Salad (GF)&#10;&#10;Use \n to force the tag to a new line:&#10;Chicken Shawarma Rice Bowls \n(Halal)"
+                placeholder="Enter items, one per line&#10;&#10;Add sub text:&#10;Veggie Wrap \tag{Vegan}&#10;&#10;Multiple tags:&#10;Chicken Wrap \tag{Halal}\tag{GF}&#10;&#10;Extra spacing before tag:&#10;Long Food Name \n\tag{Halal}"
               />
+
+              {/* Instruction Panel */}
+              <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-xs text-gray-500 font-mono">
+                <div className="font-sans font-semibold text-gray-600 mb-2 text-xs uppercase tracking-wide">Commands</div>
+                <div className="space-y-2">
+                  <div className="flex gap-3">
+                    <span className="text-gray-800 font-semibold whitespace-nowrap">\tag{"{...}"}</span>
+                    <div>
+                      <div className="text-gray-600">Add sub text (stackable)</div>
+                      <div className="text-gray-400">Chicken Wrap \tag{"{Halal}"}\tag{"{GF}"}</div>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <span className="text-gray-800 font-semibold whitespace-nowrap">\n</span>
+                    <div>
+                      <div className="text-gray-600">Force sub text to new line</div>
+                      <div className="text-gray-400">Long Food Name \n\tag{"{Halal}"}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Stats Bar */}
               <div className="mt-3 flex items-center justify-between text-sm">
@@ -267,7 +296,7 @@ export default function LabelMaker() {
             </div>
 
             {/* Preview Content */}
-            <div className="p-4 bg-gray-200 h-[479px] overflow-y-auto">
+            <div ref={previewContainerRef} className="p-4 bg-gray-200 h-[479px] overflow-y-auto">
               {computedLabels.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-16 text-gray-400">
                   <svg
@@ -293,41 +322,44 @@ export default function LabelMaker() {
                   {pages.filter(Boolean).map((pageLabels, pageIndex) => (
                     <div
                       key={pageIndex}
-                      className="bg-white rounded shadow-md overflow-hidden border border-gray-300 relative"
+                      className="bg-white rounded shadow-md border border-gray-300 relative overflow-hidden"
                       style={{ aspectRatio: "11 / 8.5" }}
                     >
-                      {/* Labels - matches print layout */}
-                      <div className="flex flex-col h-full">
+                      <div
+                        style={{
+                          width: 1056,
+                          height: 816,
+                          transformOrigin: "top left",
+                          transform: `scale(${previewScale})`,
+                          position: "absolute",
+                          top: 0,
+                          left: 0,
+                        }}
+                      >
                         {pageLabels.map((item, index) => (
                           <div
                             key={index}
-                            className="flex py-4 mr-10 border-b border-r border-gray-300 bg-white flex items-center px-3 gap-3 overflow-hidden"
+                            style={{ width: 944, height: 132 }}
+                            className="border-b border-r border-gray-300 bg-white flex items-center px-6 gap-6 overflow-hidden"
                           >
-                            {/* Logo - proportional to print */}
                             <img
                               src="/label.png"
                               alt="CaterDash Logo"
-                              className="h-8 w-auto object-contain ml-2 flex-shrink-0"
+                              className="h-20 w-auto object-contain ml-5 flex-shrink-0"
                             />
-
-                            {/* Label Text - matches print styling */}
-                            <div className="flex-grow min-w-0 flex flex-col justify-center">
+                            <div className="flex-grow min-w-0 flex flex-col justify-center mx-4">
                               {item.inline ? (
-                                <p className="text-sm font-bold text-gray-900 truncate">
+                                <h2 className="text-4xl font-bold" style={{ whiteSpace: "pre-line" }}>
                                   {item.name}{" "}
                                   {item.tag && (
-                                    <span className="text-gray-800">
-                                      ({item.tag})
-                                    </span>
+                                    <span className="text-gray-800">({item.tag})</span>
                                   )}
-                                </p>
+                                </h2>
                               ) : (
                                 <>
-                                  <p className="text-sm font-bold text-gray-900 truncate">
-                                    {item.name}
-                                  </p>
+                                  <h2 className="text-4xl font-bold" style={{ whiteSpace: "pre-line" }}>{item.name}</h2>
                                   {item.tag && (
-                                    <p className="text-xs italic text-gray-600 truncate">
+                                    <p className="text-xl italic text-gray-600 mt-1">
                                       ({item.tag})
                                     </p>
                                   )}
@@ -336,30 +368,26 @@ export default function LabelMaker() {
                             </div>
                           </div>
                         ))}
-                        {/* Empty space for remaining labels if less than 5 */}
                         {Array.from({
                           length: LABELS_PER_PAGE - pageLabels.length,
                         }).map((_, i) => (
                           <div
                             key={`empty-${i}`}
-                            className="flex-1 border-b border-r border-gray-300 bg-white"
+                            style={{ width: 944, height: 132 }}
+                            className="border-b border-r border-gray-300 bg-white"
                           />
                         ))}
-                      </div>
-
-                      {/* Bottom right: title and page number */}
-                      {(pageTitle || pages.length > 1) && (
-                        <div className="absolute bottom-1 right-2 text-right">
-                          {pageTitle && (
-                            <p className="text-[10px] font-medium text-gray-500 truncate max-w-28">
-                              {pageTitle}
+                        {(pageTitle || pages.length > 1) && (
+                          <div className="absolute bottom-2 right-4 text-right text-gray-500">
+                            {pageTitle && (
+                              <p className="text-sm font-medium">{pageTitle}</p>
+                            )}
+                            <p className="text-xs">
+                              Page {pageIndex + 1} of {pages.length}
                             </p>
-                          )}
-                          <p className="text-[9px] text-gray-400">
-                            Page {pageIndex + 1} of {pages.length}
-                          </p>
-                        </div>
-                      )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -393,7 +421,7 @@ export default function LabelMaker() {
 
                 <div className="flex-grow min-w-0 flex flex-col justify-center mx-4">
                   {item.inline ? (
-                    <h2 className="text-4xl font-bold">
+                    <h2 className="text-4xl font-bold" style={{ whiteSpace: "pre-line" }}>
                       {item.name}{" "}
                       {item.tag && (
                         <span className="text-gray-800">({item.tag})</span>
@@ -401,7 +429,7 @@ export default function LabelMaker() {
                     </h2>
                   ) : (
                     <>
-                      <h2 className="text-4xl font-bold">{item.name}</h2>
+                      <h2 className="text-4xl font-bold" style={{ whiteSpace: "pre-line" }}>{item.name}</h2>
                       {item.tag && (
                         <p className="text-xl italic text-gray-600 mt-1">
                           ({item.tag})
