@@ -36,18 +36,76 @@ const autoResize = (el: HTMLTextAreaElement) => {
   el.style.height = el.scrollHeight + "px";
 };
 
-function parseImportText(raw: string): ItemEntry[] {
-  return raw
-    .split("\n")
-    .map(line => line.trim())
-    .filter(Boolean)
-    .map(line => {
-      const match = line.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
-      if (match) {
-        return { id: newId(), text: match[1].trim(), subtext: match[2].trim(), quantity: 1 };
-      }
-      return { id: newId(), text: line.trim(), subtext: "", quantity: 1 };
-    });
+const clampQty = (n: number) => Math.max(1, Math.min(99, n));
+
+function parseLine(raw: string): ItemEntry | null {
+  // Strip bullets ("- ", "• ") and list numbering ("1. ", "2) ")
+  let line = raw.replace(/^\s*(?:[-–—*•·]+|\d{1,2}[.)])\s+/, "").trim();
+  if (!line) return null;
+
+  // Drop a trailing price, e.g. "… — $12.50"
+  line = line.replace(/\s*[-–—:]?\s*\$\s?\d+(?:[.,]\d{2})?\s*$/, "").trim();
+
+  let quantity = 1;
+
+  // Leading quantity: "2x Item", "2 × Item", "(2) Item", "2 Item"
+  let m =
+    line.match(/^\(?\s*(\d{1,2})\s*\)?\s*[x×]\s*(.+)$/i) ||
+    line.match(/^\(\s*(\d{1,2})\s*\)\s*(.+)$/) ||
+    line.match(/^(\d{1,2})\s+(.+)$/);
+  if (m) {
+    quantity = clampQty(parseInt(m[1], 10));
+    line = m[2].trim();
+  } else {
+    // Trailing quantity: "Item x2", "Item (x2)", "Item — 2", "Item<tab>2", "Item qty 2"
+    m =
+      line.match(/^(.*?)[\s,–—-]*\(?\s*(?:x|×|qty\.?:?|quantity:?)\s*(\d{1,2})\s*\)?$/i) ||
+      line.match(/^(.*?)\s*[–—-]\s*(\d{1,2})$/) ||
+      line.match(/^(.*?)\t+\s*(\d{1,2})$/);
+    if (m && m[1].trim()) {
+      quantity = clampQty(parseInt(m[2], 10));
+      line = m[1].trim();
+    }
+  }
+
+  // Drop everything after a colon, e.g. "Chicken Sandwiches: no mayo"
+  const colon = line.indexOf(":");
+  if (colon !== -1) {
+    line = line.slice(0, colon).trim();
+    if (!line) return null;
+  }
+
+  // Trailing "(note)" becomes the sub text
+  const sub = line.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+  if (sub && sub[1].trim()) {
+    return { id: newId(), text: sub[1].trim(), subtext: sub[2].trim(), quantity };
+  }
+
+  return { id: newId(), text: line, subtext: "", quantity };
+}
+
+function parseImportText(raw: string, previous: ItemEntry[] = []): ItemEntry[] {
+  const parsed: ItemEntry[] = [];
+  raw.split("\n").forEach(line => {
+    const item = parseLine(line);
+    // Reuse the id at the same position so rows keep focus/state while typing
+    if (item) parsed.push({ ...item, id: previous[parsed.length]?.id ?? item.id });
+  });
+  return parsed;
+}
+
+// Inverse of parseLine — what the list looks like as order text
+function serializeItems(items: ItemEntry[]): string {
+  return items
+    .map(({ text, subtext, quantity }) => {
+      const name = text.replace(/\s*\n\s*/g, " ").trim();
+      const sub = subtext.replace(/\s*\n\s*/g, " ").trim();
+      // A name starting with a number ("7 Layer Dip") needs an explicit qty,
+      // otherwise reparsing would read that number as the quantity
+      const prefix = quantity > 1 || /^\d/.test(name) ? `${quantity}x ` : "";
+      return [prefix, name, sub ? ` (${sub})` : ""].join("");
+    })
+    .join("\n");
 }
 
 
@@ -57,8 +115,8 @@ export default function LabelMaker() {
   const [pageTitle, setPageTitle] = useState("");
   const [blankLabels, setBlankLabels] = useState(0);
   const [dragOverIndex, setDragOverIndex] = useState<number>(-1);
-  const [showImport, setShowImport] = useState(false);
-  const [importText, setImportText] = useState("");
+  const [showImport, setShowImport] = useState(true);
+  const [orderText, setOrderText] = useState("");
 
   const focusNextId = useRef<string | null>(null);
   const dragIndex = useRef<number>(-1);
@@ -137,30 +195,40 @@ export default function LabelMaker() {
     });
   }, [computedLabels, isMounted]);
 
+  // The list and the order text are two views of the same data, kept in sync.
+  // Editing the text reparses the list; editing the list rewrites the text.
+  const commitItems = (next: ItemEntry[]) => {
+    setItems(next);
+    setOrderText(serializeItems(next));
+  };
+
+  const editOrderText = (text: string) => {
+    setOrderText(text);
+    setItems(prev => parseImportText(text, prev));
+  };
+
   const addItem = () => {
     const id = newId();
     focusNextId.current = id;
-    setItems(prev => [...prev, { id, text: "", subtext: "", quantity: 1 }]);
+    commitItems([...items, { id, text: "", subtext: "", quantity: 1 }]);
   };
 
   const updateItem = (id: string, patch: Partial<ItemEntry>) => {
-    setItems(prev => prev.map(item => item.id === id ? { ...item, ...patch } : item));
+    commitItems(items.map(item => item.id === id ? { ...item, ...patch } : item));
   };
 
-  const removeItem = (id: string) => setItems(prev => prev.filter(i => i.id !== id));
+  const removeItem = (id: string) => commitItems(items.filter(i => i.id !== id));
 
   const moveItem = (from: number, to: number) => {
     if (from === to) return;
-    setItems(prev => {
-      const next = [...prev];
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-      return next;
-    });
+    const next = [...items];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    commitItems(next);
   };
 
-  const loadExample = () => setItems(DEFAULT_ITEMS);
-  const clearAll = () => { setItems([]); setPageTitle(""); setBlankLabels(0); };
+  const loadExample = () => commitItems(DEFAULT_ITEMS);
+  const clearAll = () => { commitItems([]); setPageTitle(""); setBlankLabels(0); };
 
   if (!isMounted) return null;
 
@@ -240,6 +308,44 @@ export default function LabelMaker() {
           {/* Left Panel */}
           <div className="space-y-4">
 
+            {/* Order text — a live, editable view of the item list */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <button
+                onClick={() => setShowImport(v => !v)}
+                className="w-full flex items-center justify-between px-5 py-3 text-left hover:bg-gray-50 transition-colors"
+              >
+                <span className="text-sm font-semibold text-gray-700">Order Text</span>
+                <span className="flex items-center gap-2 text-xs text-gray-400">
+                  {showImport ? "Hide" : "Show"}
+                  <svg
+                    className={`w-4 h-4 transition-transform ${showImport ? "rotate-180" : ""}`}
+                    fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </span>
+              </button>
+
+              {showImport && (
+                <div className="px-5 pb-4 border-t border-gray-100 pt-3">
+                  <p className="text-xs text-gray-500 mb-2">
+                    Paste the order email here — one item per line. Labels update as you type, and this box
+                    stays in sync with the list below, so you can edit in either place. Quantities like{" "}
+                    <span className="font-mono bg-gray-100 px-1 rounded">2x</span> are picked up, text in{" "}
+                    <span className="font-mono bg-gray-100 px-1 rounded">(brackets)</span> becomes sub text, and
+                    anything after a <span className="font-mono bg-gray-100 px-1 rounded">:</span> is dropped.
+                  </p>
+                  <textarea
+                    rows={8}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono leading-6 focus:outline-none focus:ring-2 focus:ring-red-300 transition resize-y"
+                    placeholder={"2x Chicken Sandwiches\nVeggie Sandwiches (Veg)\n3x Falafel Rice Bowls (Vegan)"}
+                    value={orderText}
+                    onChange={(e) => editOrderText(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
+
             {/* Page Title */}
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -290,57 +396,11 @@ export default function LabelMaker() {
                     Load example
                   </button>
                   <span className="text-gray-200">|</span>
-                  <button
-                    onClick={() => { setShowImport(v => !v); setImportText(""); }}
-                    className={`text-xs transition-colors ${showImport ? "text-red-600" : "text-gray-500 hover:text-red-600"}`}
-                  >
-                    {showImport ? "Cancel import" : "Import text"}
-                  </button>
-                  <span className="text-gray-200">|</span>
                   <button onClick={clearAll} className="text-xs text-gray-500 hover:text-red-600 transition-colors">
                     Clear all
                   </button>
                 </div>
               </div>
-
-              {/* Import panel */}
-              {showImport && (
-                <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-                  <p className="text-xs text-gray-500 mb-2">
-                    Paste items — one per line. Text in <span className="font-mono bg-gray-200 px-1 rounded">(brackets)</span> becomes sub text.
-                  </p>
-                  <textarea
-                    autoFocus
-                    rows={5}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-red-300 transition resize-y"
-                    placeholder={"Chicken Sandwiches\nVeggie Sandwiches (Veg)\nFalafel Rice Bowls (Vegan)"}
-                    value={importText}
-                    onChange={(e) => setImportText(e.target.value)}
-                  />
-                  <div className="flex items-center gap-2 mt-2">
-                    <button
-                      onClick={() => {
-                        const parsed = parseImportText(importText);
-                        if (parsed.length) { setItems(parsed); setShowImport(false); setImportText(""); }
-                      }}
-                      disabled={!importText.trim()}
-                      className="px-4 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Import & replace
-                    </button>
-                    <button
-                      onClick={() => {
-                        const parsed = parseImportText(importText);
-                        if (parsed.length) { setItems(prev => [...prev, ...parsed]); setShowImport(false); setImportText(""); }
-                      }}
-                      disabled={!importText.trim()}
-                      className="px-4 py-1.5 border border-gray-200 text-gray-600 text-xs font-medium rounded-lg hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                    >
-                      Add to existing
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* Item list */}
               <div className="max-h-[520px] overflow-y-auto">
@@ -353,7 +413,7 @@ export default function LabelMaker() {
                       </svg>
                     </div>
                     <p className="text-sm font-medium text-gray-600 mb-1">No items yet</p>
-                    <p className="text-xs text-gray-400 mb-4">Add items below or load an example to get started</p>
+                    <p className="text-xs text-gray-400 mb-4">Paste the order above, or add items one at a time</p>
                     <button onClick={addItem} className="text-sm text-red-600 font-medium hover:text-red-700 transition-colors">
                       + Add your first item
                     </button>
